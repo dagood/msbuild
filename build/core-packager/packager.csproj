@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  
+  <!-- this is filled in by the dir.props usually, but given that importing it impacts a lot of other pieces of the build, I am keeping this separate -->
+  <PropertyGroup>
+    <BinDir>../../../bin</BinDir>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <Configuration>Debug</Configuration>
+    <NuGetPackageLicenseUrl>http://go.microsoft.com/fwlink/?LinkId=329770</NuGetPackageLicenseUrl>
+    <NuGetPackageIconUrl>https://go.microsoft.com/fwlink/?linkid=825694</NuGetPackageIconUrl>
+    <NuGetPackageProjectUrl>http://go.microsoft.com/fwlink/?LinkId=624683</NuGetPackageProjectUrl>
+    <PackagesBasePath>$([System.IO.Path]::GetFullPath('$(BaseOutputPathWithConfig)..'))</PackagesBasePath>
+    <PackagesOutDir>$([System.IO.Path]::Combine($(PackagesBasePath), 'Packages'))</PackagesOutDir>
+    <SkipVersionGeneration>true</SkipVersionGeneration>
+    <NuGetPackageVersion>1.0.0</NuGetPackageVersion>
+    <DoNotGeneratePackageVersion>true</DoNotGeneratePackageVersion>
+    <TargetMSBuildToolsVersion>15.0</TargetMSBuildToolsVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <NuspecProperty Include="version=$(NuGetPackageVersion)"/>
+    <NuspecProperty Include="configuration=$(Configuration)"/>
+    <NuspecProperty Include="licenseUrl=$(NuGetPackageLicenseUrl)"/>
+    <NuspecProperty Include="projectUrl=$(NuGetPackageProjectUrl)"/>
+    <NuspecProperty Include="iconUrl=$(NuGetPackageIconUrl)"/>
+    <NuspecProperty Include="targetMSBuildToolsVersion=$(TargetMSBuildToolsVersion)"/>
+    <NuspecProperty Include="authors=Bryan" />
+    <NuspecProperty Include="id=$(NuspecName)" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.4</TargetFramework>
+
+    <NuspecFile>$(TargetNuspec)</NuspecFile>
+    <NuspecProperties>@(NuspecProperty)</NuspecProperties>
+    <NuspecBasePath>$(BinDir)</NuspecBasePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <NuspecFiles Include="nuspecs/*.nuspec" />
+  </ItemGroup>
+
+  <Target Name="_PrePack" BeforeTargets="GenerateNuspec">
+    <Message Importance="High" Text="Packing using properties: $(NuspecProperties)"/>
+  </Target>
+
+  <Target Name="PackAll">
+    <Message Importance="High" Text="Packing nuspecs..." />
+
+    <MSBuild Projects="packager.csproj" Targets="Pack" Properties="NuspecName=%(NuspecFiles.Filename);TargetNuspec=%(NuspecFiles.Identity);$(NuspecProperties)"/>
+  </Target>
+
+  <Import Project="$(MSBuildSDKsPath)\NuGet.Build.Tasks.Pack\buildCrossTargeting\NuGet.Build.Tasks.Pack.targets" />
+</Project>
