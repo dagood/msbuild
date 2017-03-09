@@ -2,7 +2,7 @@
   
   <!-- this is filled in by the dir.props usually, but given that importing it impacts a lot of other pieces of the build, I am keeping this separate -->
   <PropertyGroup>
-    <BinDir>../../../bin</BinDir>
+    <BinDir>../../bin</BinDir>
   </PropertyGroup>
   
   <PropertyGroup>

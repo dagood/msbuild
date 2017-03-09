@@ -29,7 +29,7 @@
     <!--
       contentFiles\any\netcoreapp1.0
     -->
-    <file src="$configuration$-NetCore\Output\MSBuild.dll" target="contentFiles\any\netcoreapp1.0\" />
+    <file src="$configuration$-NetCore\Output\MSBuild.dll" target="lib\any\netcoreapp1.0\" />
     <file src="$configuration$-NetCore\Output\MSBuild.runtimeconfig.json" target="contentFiles\any\netcoreapp1.0\" />
     <file src="$configuration$-NetCore\Output\Microsoft.Common.CrossTargeting.targets" target="contentFiles\any\netcoreapp1.0\" />
     <file src="$configuration$-NetCore\Output\Microsoft.Common.CurrentVersion.targets" target="contentFiles\any\netcoreapp1.0\" />
