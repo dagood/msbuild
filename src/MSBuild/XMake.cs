@@ -34,6 +34,7 @@ using FileLogger = Microsoft.Build.Logging.FileLogger;
 using ConsoleLogger = Microsoft.Build.Logging.ConsoleLogger;
 using LoggerDescription = Microsoft.Build.Logging.LoggerDescription;
 using ForwardingLoggerRecord = Microsoft.Build.Logging.ForwardingLoggerRecord;
+using BinaryLogger = Microsoft.Build.Logging.BinaryLogger;
 
 namespace Microsoft.Build.CommandLine
 {
@@ -597,26 +598,36 @@ namespace Microsoft.Build.CommandLine
 
                     DateTime t1 = DateTime.Now;
 
+                    // If the primary file passed to MSBuild is a .binlog file, play it back into passed loggers
+                    // as if a build is happening
+                    if (FileUtilities.IsBinaryLogFilename(projectFile))
+                    {
+                        ReplayBinaryLog(projectFile, loggers, distributedLoggerRecords, cpuCount);
+                    }
+                    else // regular build
+                    {
 #if !STANDALONEBUILD
                     if (Environment.GetEnvironmentVariable("MSBUILDOLDOM") != "1")
 #endif
-                    {
-                        // if everything checks out, and sufficient information is available to start building
-                        if (!BuildProject(projectFile, targets, toolsVersion, globalProperties, loggers, verbosity, distributedLoggerRecords.ToArray(),
+                        {
+                            // if everything checks out, and sufficient information is available to start building
+                            if (!BuildProject(projectFile, targets, toolsVersion, globalProperties, loggers, verbosity, distributedLoggerRecords.ToArray(),
 #if FEATURE_XML_SCHEMA_VALIDATION
                             needToValidateProject, schemaFile,
 #endif
                             cpuCount, enableNodeReuse, preprocessWriter, debugger, detailedSummary, warningsAsErrors, warningsAsMessages))
-                        {
-                            exitType = ExitType.BuildError;
+                            {
+                                exitType = ExitType.BuildError;
+                            }
                         }
-                    }
 #if !STANDALONEBUILD
                     else
                     {
                         exitType = OldOMBuildProject(exitType, projectFile, targets, toolsVersion, globalProperties, loggers, verbosity, needToValidateProject, schemaFile, cpuCount);
                     }
 #endif
+                    } // end of build
+
                     DateTime t2 = DateTime.Now;
 
                     TimeSpan elapsedTime = t2.Subtract(t1);
@@ -625,7 +636,7 @@ namespace Microsoft.Build.CommandLine
 
                     if (!String.IsNullOrEmpty(timerOutputFilename))
                     {
-                        AppendOutputFile(timerOutputFilename, elapsedTime.Milliseconds);
+                        AppendOutputFile(timerOutputFilename, (long)elapsedTime.TotalMilliseconds);
                     }
                 }
                 else
@@ -1347,7 +1358,7 @@ namespace Microsoft.Build.CommandLine
             // split the command line on (unquoted) whitespace
             ArrayList commandLineArgs = QuotingUtilities.SplitUnquoted(commandLine);
 
-            s_exeName = FileUtilities.FixFilePath(QuotingUtilities.Unquote((string) commandLineArgs[0]));
+            s_exeName = FileUtilities.FixFilePath(QuotingUtilities.Unquote((string)commandLineArgs[0]));
 #else
             ArrayList commandLineArgs = new ArrayList(commandLine);
 
@@ -1441,7 +1452,7 @@ namespace Microsoft.Build.CommandLine
                         bool unquoteParameters;
                         bool allowEmptyParameters;
 
-                        // Special case: for the switch "/m" or "/maxCpuCount" we wish to pretend we saw "/m:<number of cpus>"
+                        // Special case: for the switches "/m" (or "/maxCpuCount") and "/bl" (or "/binarylogger") we wish to pretend we saw a default argument
                         // This allows a subsequent /m:n on the command line to override it.
                         // We could create a new kind of switch with optional parameters, but it's a great deal of churn for this single case. 
                         // Note that if no "/m" or "/maxCpuCount" switch -- either with or without parameters -- is present, then we still default to 1 cpu
@@ -1453,6 +1464,13 @@ namespace Microsoft.Build.CommandLine
                             {
                                 int numberOfCpus = Environment.ProcessorCount;
                                 switchParameters = ":" + numberOfCpus;
+                            }
+                            else if (String.Equals(switchName, "bl", StringComparison.OrdinalIgnoreCase) ||
+                                String.Equals(switchName, "binarylogger", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // we have to specify at least one parameter otherwise it's impossible to distinguish the situation
+                                // where /bl is not specified at all vs. where /bl is specified without the file name.
+                                switchParameters = ":msbuild.binlog";
                             }
                         }
 
@@ -1960,6 +1978,7 @@ namespace Microsoft.Build.CommandLine
                         commandLineSwitches[CommandLineSwitches.ParameterlessSwitch.DistributedFileLogger],
                         commandLineSwitches[CommandLineSwitches.ParameterizedSwitch.FileLoggerParameters], // used by DistributedFileLogger
                         commandLineSwitches[CommandLineSwitches.ParameterizedSwitch.ConsoleLoggerParameters],
+                        commandLineSwitches[CommandLineSwitches.ParameterizedSwitch.BinaryLogger],
                         groupedFileLoggerParameters,
                         out distributedLoggerRecords,
                         out verbosity,
@@ -2078,7 +2097,7 @@ namespace Microsoft.Build.CommandLine
                     // so that all warnings are treated errors
                     warningsAsErrors.Clear();
                 }
-                else if(!String.IsNullOrWhiteSpace(code))
+                else if (!String.IsNullOrWhiteSpace(code))
                 {
                     warningsAsErrors.Add(code.Trim());
                 }
@@ -2168,7 +2187,7 @@ namespace Microsoft.Build.CommandLine
                         OutOfProcNode node = new OutOfProcNode(clientToServerPipeHandle, serverToClientPipeHandle);
 #endif
 
-                        
+
                         bool nodeReuse = false;
 #if FEATURE_NODE_REUSE
                         nodeReuse = ProcessNodeReuseSwitch(commandLineSwitches[CommandLineSwitches.ParameterizedSwitch.NodeReuse]);
@@ -2585,6 +2604,7 @@ namespace Microsoft.Build.CommandLine
             bool distributedFileLogger,
             string[] fileLoggerParameters,
             string[] consoleLoggerParameters,
+            string[] binaryLoggerParameters,
             string[][] groupedFileLoggerParameters,
             out List<DistributedLoggerRecord> distributedLoggerRecords,
             out LoggerVerbosity verbosity,
@@ -2611,6 +2631,8 @@ namespace Microsoft.Build.CommandLine
             ProcessDistributedFileLogger(distributedFileLogger, fileLoggerParameters, distributedLoggerRecords, loggers, cpuCount);
 
             ProcessFileLoggers(groupedFileLoggerParameters, distributedLoggerRecords, verbosity, cpuCount, loggers);
+
+            ProcessBinaryLogger(binaryLoggerParameters, loggers, ref verbosity);
 
             if (verbosity == LoggerVerbosity.Diagnostic)
             {
@@ -2695,6 +2717,26 @@ namespace Microsoft.Build.CommandLine
                     distributedLoggerRecords.Add(forwardingLoggerRecord);
                 }
             }
+        }
+
+        private static void ProcessBinaryLogger(string[] binaryLoggerParameters, ArrayList loggers, ref LoggerVerbosity verbosity)
+        {
+            if (binaryLoggerParameters == null || binaryLoggerParameters.Length == 0)
+            {
+                return;
+            }
+
+            string outputLogFilePath = binaryLoggerParameters[binaryLoggerParameters.Length - 1];
+
+            BinaryLogger logger = new BinaryLogger();
+            logger.Parameters = outputLogFilePath;
+
+            // If we have a binary logger, force verbosity to diagnostic.
+            // The only place where verbosity is used downstream is to determine whether to log task inputs.
+            // Since we always want task inputs for a binary logger, set it to diagnostic.
+            verbosity = LoggerVerbosity.Diagnostic;
+
+            loggers.Add(logger);
         }
 
         /// <summary>
@@ -3135,6 +3177,62 @@ namespace Microsoft.Build.CommandLine
             return logger;
         }
 
+        private static void ReplayBinaryLog
+        (
+            string binaryLogFilePath,
+            ILogger[] loggers,
+            IEnumerable<DistributedLoggerRecord> distributedLoggerRecords,
+            int cpuCount)
+        {
+            var replayEventSource = new Logging.BinaryLogReplayEventSource();
+
+            foreach (var distributedLoggerRecord in distributedLoggerRecords)
+            {
+                var nodeLogger = distributedLoggerRecord.CentralLogger as INodeLogger;
+                if (nodeLogger != null)
+                {
+                    nodeLogger.Initialize(replayEventSource, cpuCount);
+                }
+                else
+                {
+                    distributedLoggerRecord.CentralLogger.Initialize(replayEventSource);
+                }
+            }
+
+            foreach (var logger in loggers)
+            {
+                var nodeLogger = logger as INodeLogger;
+                if (nodeLogger != null)
+                {
+                    nodeLogger.Initialize(replayEventSource, cpuCount);
+                }
+                else
+                {
+                    logger.Initialize(replayEventSource);
+                }
+            }
+
+            try
+            {
+                replayEventSource.Replay(binaryLogFilePath);
+            }
+            catch (Exception ex)
+            {
+                var message = ResourceUtilities.FormatResourceString("InvalidLogFileFormat", ex.Message);
+                Console.WriteLine(message);
+            }
+
+            foreach (var logger in loggers)
+            {
+                logger.Shutdown();
+            }
+
+            foreach (var distributedLoggerRecord in distributedLoggerRecords)
+            {
+                distributedLoggerRecord.CentralLogger.Shutdown();
+            }
+        }
+
         /// <summary>
         /// Figures out if the project needs to be validated against a schema.
         /// </summary>
@@ -3216,6 +3314,7 @@ namespace Microsoft.Build.CommandLine
             Console.WriteLine(AssemblyResources.GetString("HelpMessage_18_DistributedLoggerSwitch"));
             Console.WriteLine(AssemblyResources.GetString("HelpMessage_21_DistributedFileLoggerSwitch"));
             Console.WriteLine(AssemblyResources.GetString("HelpMessage_11_LoggerSwitch"));
+            Console.WriteLine(AssemblyResources.GetString("HelpMessage_30_BinaryLoggerSwitch"));
             Console.WriteLine(AssemblyResources.GetString("HelpMessage_28_WarnAsErrorSwitch"));
             Console.WriteLine(AssemblyResources.GetString("HelpMessage_29_WarnAsMessageSwitch"));
 #if FEATURE_XML_SCHEMA_VALIDATION

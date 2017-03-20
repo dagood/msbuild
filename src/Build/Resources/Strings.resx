@@ -339,6 +339,12 @@
   <data name="ErrorWarningMessageNotSupported" UESanitized="false" Visibility="Public">
     <value>The &lt;{0}&gt; tag is no longer supported as a child of the &lt;Project&gt; element. Place this tag within a target, and add the name of the target to the "InitialTargets" attribute of the &lt;Project&gt; element.</value>
   </data>
+  <data name="EvaluationStarted" UESanitized="false" Visibility="Public">
+    <value>Evaluation started ("{0}")</value>
+  </data>
+  <data name="EvaluationFinished" UESanitized="false" Visibility="Public">
+    <value>Evaluation finished ("{0}")</value>
+  </data>
   <data name="ExecutingTaskInTaskHost">
     <value>Launching task "{0}" from assembly "{1}" in an external task host with a runtime of "{2}" and a process architecture of "{3}".</value>
   </data>
@@ -443,6 +449,10 @@
     <value>MSB4102: The value "{0}" of the "{1}" attribute in element &lt;{2}&gt; is invalid. {3}</value>
     <comment>{StrBegin="MSB4102: "}UE: This is a generic message that is displayed when we find a project element with an incorrect value for one of its
         attributes. At the end of the message we show the exception text we got trying to use the value.</comment>
+  </data>
+  <data name="InvalidBinaryLoggerParameters" UESanitized="false" Visibility="Public">
+    <value>MSB4234: The binary logger expects a single parameter (the output file name). {0} parameters were passed: "{1}".</value>
+    <comment>{StrBegin="MSB4234: "}This is shown when the Binary Logger is passed zero or more than one parameter.</comment>
   </data>
   <data name="InvalidContinueOnErrorAttribute" UESanitized="false" Visibility="Public">
     <value>MSB4021: The "ContinueOnError" attribute of the "{0}" task is not valid. {1}</value>
@@ -735,6 +745,9 @@
   <data name="PropertyNameInRegistryHasZeroLength" UESanitized="false" Visibility="Public">
     <value>MSB4148: The name of a property stored under the registry key "{0}" has zero length.</value>
     <comment>{StrBegin="MSB4148: "}</comment>
+  </data>
+  <data name="PropertyReassignment" UESanitized="false" Visibility="Public">
+    <value>Property reassignment: $({0})="{1}" (previous value: "{2}") at {3}</value>
   </data>
   <data name="QualifiedMetadataInTransformNotAllowed" UESanitized="false" Visibility="Public">
     <value>MSB4043: The item metadata reference "{0}" is invalid because it is qualified with an item name. Item metadata referenced in transforms do not need to be qualified, because the item name is automatically deduced from the items being transformed. Change "{0}" to "%({1})".</value>
@@ -1185,6 +1198,10 @@
     <value>MSB4068: The element &lt;{0}&gt; is unrecognized, or not supported in this context.</value>
     <comment>{StrBegin="MSB4068: "}</comment>
   </data>
+  <data name="UnsupportedLogFileFormat" UESanitized="false" Visibility="Public">
+    <value>MSB4235: The log file format version is {0}, whereas this version of MSBuild only supports versions up to {1}.</value>
+    <comment>{StrBegin="MSB4235: "}</comment>
+  </data>
   <data name="UnsupportedTaskParameterTypeError" UESanitized="false" Visibility="Public">
     <value>MSB4069: The "{0}" type of the "{1}" parameter of the "{2}" task is not supported by MSBuild.</value>
     <comment>{StrBegin="MSB4069: "}LOCALIZATION: "MSBuild" should not be localized.</comment>
@@ -1551,11 +1568,6 @@ Utilization:          {0} Average Utilization: {1:###.0}</value>
   </data>
   
   <!-- Engine errors for features not supported on .NET Core have the arbitrarily-chosen 48 prefix -->
-  <data name="TaskFactoryNotSupportedFailure" xml:space="preserve">
-    <value>MSB4801: The task factory "{0}" could not be loaded because this version of MSBuild does not support it.</value>
-    <comment>{StrBegin="MSB4801: "}</comment>
-  </data>
-
   <data name="TaskInstantiationFailureNotSupported" xml:space="preserve">
     <value>MSB4802: The "{0}" task could not be instantiated from "{1}". This version of MSBuild does not support {2}.</value>
     <comment>{StrBegin="MSB4802: "}</comment>
@@ -1585,7 +1597,7 @@ Utilization:          {0} Average Utilization: {1:###.0}</value>
         MSB4128 is being used in FileLogger.cs (can't be added here yet as strings are currently frozen)
         MSB4129 is used by Shared\XmlUtilities.cs (can't be added here yet as strings are currently frozen)
 
-        Next message code should be MSB4233.
+        Next message code should be MSB4236.
               
         Some unused codes which can also be reused (because their messages were deleted, and UE hasn't indexed the codes yet):
             <none>
